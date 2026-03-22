@@ -24,8 +24,8 @@
 | **Code search** | GitHub code dork across multiple query patterns |
 | **Surface dorking** | Google, Bing, DuckDuckGo, Startpage, Yahoo — proxy rotation, UA randomisation, 2captcha/anticaptcha |
 | **Social/phone** | WhatsMyName (150+ platforms), NumVerify/AbstractAPI |
-| **Dark web engines** | Ahmia, Torch, Haystak, DarkSearch (API), NotEvil, Phobos, Excavator, Kilos, OnionSearchEngine — paginated (up to 5 pages each) |
-| **Dark web crawl** | Depth-2 breadth-first onion crawler — forum posts, marketplace listings, paste dumps, credential pattern extraction |
+| **Dark web engines** | Ahmia, Torch, Haystak, DarkSearch, NotEvil, Phobos, Excavator, Kilos, OnionSearchEngine — paginated |
+| **Dark web crawl** | Depth-2 breadth-first onion crawler — forum posts, marketplace listings, paste dumps, credential extraction |
 | **PwnDB** | Direct hidden-service credential lookup |
 | **Output** | JSON + CSV + TXT per scan, saved to `output/results/` |
 
@@ -35,37 +35,23 @@
 
 ```
 rsx-osint/
-├── main.py                     # Entry point
+├── main.py
 ├── requirements.txt
 ├── README.md
 ├── LICENSE
+├── install.sh          Linux / macOS installer
+├── install.ps1         Windows installer
 ├── config/
-│   ├── settings.yaml           # All configuration
-│   ├── proxies.txt             # One proxy per line
-│   └── useragents.txt          # UA rotation list
+│   ├── settings.yaml
+│   ├── proxies.txt
+│   └── useragents.txt
 ├── modules/
-│   ├── utils/
-│   │   ├── tui.py              # Rich terminal UI
-│   │   ├── config.py           # YAML loader
-│   │   ├── proxy.py            # Proxy manager
-│   │   ├── dedup.py            # Thread-safe result store
-│   │   ├── export.py           # JSON/CSV/TXT writer
-│   │   ├── http.py             # Async HTTP helpers + UA rotation
-│   │   └── menu.py             # Interactive prompt menu
-│   ├── scraper/
-│   │   ├── breach.py           # HIBP, ProxyNova, Snusbase, etc.
-│   │   ├── paste.py            # Pastebin + raw content extraction
-│   │   └── social.py           # GitHub dorks, Hunter.io
-│   ├── dorking/
-│   │   ├── engines.py          # Google/Bing/DDG/Startpage with captcha bypass
-│   │   ├── dorks.py            # Dork template library
-│   │   └── captcha.py          # 2captcha / anticaptcha integration
-│   └── darkweb/
-│       ├── engines.py          # Onion search engines (paginated)
-│       ├── crawler.py          # Depth-2 breadth-first onion crawler
-│       └── parser.py           # Forum/market/paste page type detector
+│   ├── utils/          tui · config · proxy · dedup · export · http · menu
+│   ├── scraper/        breach · paste · social
+│   ├── dorking/        engines · dorks · captcha
+│   └── darkweb/        engines · crawler · parser
 └── output/
-    └── results/                # Scan output (JSON + CSV + TXT)
+    └── results/
 ```
 
 ---
@@ -75,57 +61,143 @@ rsx-osint/
 ### Prerequisites
 
 - Python 3.10+
-- Tor (for dark web mode)
-- Playwright (optional, for JS-heavy pages)
+- Tor (required for dark web mode only)
+- Playwright (optional — for JS-heavy pages)
 
-### 1. Clone and set up virtualenv
+---
+
+### Windows
+
+**1. Install Python 3.10+**
+
+Download from https://www.python.org/downloads/ — check **"Add Python to PATH"** during install.
+
+**2. Run the installer**
+
+Open PowerShell in the `rsx-osint` folder:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\install.ps1
+```
+
+The script will:
+- Detect Python 3.10+ from `python3.12` down to `python`
+- Create a `venv\` virtualenv and install all pip packages inside it
+- Check if Tor is in PATH and test SOCKS5 connectivity on `127.0.0.1:9050`
+- Run a module import check to confirm everything is working
+- Generate both a `run.bat` (CMD) and `run.ps1` (PowerShell) launcher
+
+**3. Run the tool**
+
+```cmd
+.\run.bat
+```
+
+Or with flags:
+
+```cmd
+.\run.bat -q user@example.com -t email --clearnet
+.\run.bat -q targetuser -t username --both --tor 127.0.0.1:9050
+```
+
+---
+
+### Linux / macOS
+
+**1. Install Python 3.10+**
+
+```bash
+sudo apt install python3 python3-pip   # Debian/Ubuntu/Kali
+sudo pacman -S python                  # Arch/Manjaro
+sudo dnf install python3               # Fedora
+```
+
+**2. Run the installer**
+
+```bash
+chmod +x install.sh && ./install.sh
+```
+
+The script will:
+- Detect your distro (Kali, Debian, Ubuntu, Arch, Fedora) and use the right package manager
+- Install Tor and build dependencies via `apt` / `pacman` / `dnf`
+- Create a `venv/` virtualenv and install all pip packages inside it
+- Attempt to start the Tor service via `systemctl` and verify SOCKS5 connectivity
+- Run a module import check to confirm everything is working
+- Generate a `run.sh` launcher
+
+**3. Run the tool**
+
+```bash
+./run.sh
+```
+
+Or with flags:
+
+```bash
+./run.sh -q user@example.com -t email --clearnet
+./run.sh -q targetuser -t username --both --tor 127.0.0.1:9050
+```
+
+---
+
+### Manual install (any OS)
 
 ```bash
 git clone https://github.com/your-handle/rsx-osint.git
 cd rsx-osint
 python3 -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
+
+source venv/bin/activate          # Linux/macOS
+venv\Scripts\activate.bat         # Windows CMD
+venv\Scripts\Activate.ps1         # Windows PowerShell
+
 pip install -r requirements.txt
-```
-
-### 2. Install Playwright browser (optional)
-
-Only needed if `use_playwright: true` is set in `config/settings.yaml`.
-
-```bash
-playwright install firefox
+python3 main.py
 ```
 
 ---
 
 ## Tor Setup
 
-RSX-OSINT routes all dark web requests through Tor's SOCKS5 proxy.
+Tor is only required for `--darkweb` and `--both` modes.
 
-### Kali / Debian / Ubuntu
+### Windows
+
+Download the **Tor Expert Bundle** (not Tor Browser) from:
+https://www.torproject.org/download/tor/
+
+Extract it, then run:
+
+```cmd
+tor.exe
+```
+
+Tor will listen on `127.0.0.1:9050` by default.
+
+### Linux
 
 ```bash
 sudo apt install tor
 sudo systemctl start tor
-# Default SOCKS5: 127.0.0.1:9050
 ```
 
-### Verify Tor is running
+### Verify Tor is working
 
 ```bash
 curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
-# Should return {"IsTor":true,...}
 ```
 
-### Custom Tor port
+Should return `{"IsTor":true,...}`.
 
-If your Tor instance uses a non-default port (e.g. 9500), pass it at runtime:
+### Custom port
 
-```bash
-python3 main.py -q target@email.com -t email --darkweb --tor 127.0.0.1:9500
+```cmd
+.\run.bat -q target@email.com -t email --darkweb --tor 127.0.0.1:9500
 ```
 
-Or set it in `config/settings.yaml`:
+Or set permanently in `config/settings.yaml`:
 
 ```yaml
 tor_proxy: "127.0.0.1:9500"
@@ -143,33 +215,24 @@ socks5://192.168.1.100:1080
 http://user:pass@gate.example.com:8000
 ```
 
-**Supported formats:** `http://`, `https://`, `socks5://` — with or without credentials.
+Supported formats: `http://`, `https://`, `socks5://` with or without credentials.
 
-Proxies are rotated per request. On a 429 or CAPTCHA response the current proxy is
-marked bad and the next one is tried automatically.
+Proxies rotate per request. On a 429 or CAPTCHA the current proxy is marked bad and the next is tried automatically.
 
-**Recommended sources for free proxies:**
-- https://free-proxy-list.net
-- https://www.proxyscrape.com/free-proxy-list
-
-**For reliable dorking without captcha blocks**, use a paid rotating proxy service
-(Oxylabs, Bright Data, Smartproxy) — enter the gateway URL as a single proxy in
-`proxies.txt`.
+For reliable dorking without captcha blocks, use a paid rotating proxy service (Oxylabs, Bright Data, Smartproxy) — enter the gateway as a single line in `proxies.txt`.
 
 ---
 
 ## Captcha Bypass
 
-RSX-OSINT supports automatic captcha solving via third-party services.
-
 ### 2captcha
 
-1. Sign up at https://2captcha.com ($3 per 1000 solves)
+1. Sign up at https://2captcha.com
 2. Add to `config/settings.yaml`:
 
 ```yaml
 captcha_service: "2captcha"
-captcha_api_key: "YOUR_2CAPTCHA_KEY"
+captcha_api_key: "YOUR_KEY"
 ```
 
 ### AntiCaptcha
@@ -179,73 +242,37 @@ captcha_api_key: "YOUR_2CAPTCHA_KEY"
 
 ```yaml
 captcha_service: "anticaptcha"
-captcha_api_key: "YOUR_ANTICAPTCHA_KEY"
+captcha_api_key: "YOUR_KEY"
 ```
-
-When a search engine triggers a reCAPTCHA, the tool will automatically submit it
-for solving and retry the request with the returned token.
 
 ---
 
-## API Keys (optional but recommended)
+## API Keys (optional)
 
 Configure in `config/settings.yaml` under `api_keys:`:
 
 | Key | Source | Cost | Enables |
 |---|---|---|---|
 | `hibp` | https://haveibeenpwned.com/API/Key | $3.50/mo | Full email breach detail |
-| `hunter` | https://hunter.io | Free (25/mo) | Domain email enumeration |
+| `hunter` | https://hunter.io | Free 25/mo | Domain email enumeration |
 | `virustotal` | https://virustotal.com | Free tier | IP/domain/hash analysis |
 | `snusbase` | https://snusbase.com | Paid | Large password DB search |
 | `leakix` | https://leakix.net | Free tier | Leak DB search |
 | `breachdirectory` | https://breachdirectory.org | Free tier | Breach credential lookup |
 
-Without API keys the tool still runs with ~70% of sources active.
+The tool runs with ~70% of sources active without any API keys.
 
 ---
 
 ## Usage
 
-### Interactive TUI (recommended)
+### Interactive TUI
 
-```bash
-python3 main.py
+```cmd
+.\run.bat
 ```
 
-Follow the prompts to select search type, query, network mode, and optional API keys.
-
-### CLI flags
-
-```bash
-# Surface web only — email
-python3 main.py -q user@example.com -t email --clearnet
-
-# Username across all surfaces
-python3 main.py -q targetuser -t username --clearnet
-
-# Dark web only (Tor required)
-python3 main.py -q target@example.com -t email --darkweb --tor 127.0.0.1:9050
-
-# Both surface + dark web
-python3 main.py -q example.com -t domain --both --tor 127.0.0.1:9050
-
-# IP recon
-python3 main.py -q 1.2.3.4 -t ip --clearnet
-
-# Hash lookup (HIBP k-anon, VirusTotal)
-python3 main.py -q 5f4dcc3b5aa765d61d8327deb882cf99 -t hash --clearnet
-
-# Suppress file output
-python3 main.py -q target -t username --clearnet --no-save
-
-# Override crawl depth
-python3 main.py -q target@mail.com -t email --both --depth 2
-
-# Override proxy list
-python3 main.py -q target -t username --clearnet --proxy-file /path/to/proxies.txt
-```
-
-### All flags
+### All CLI flags
 
 ```
 -q / --query        Target string
@@ -253,7 +280,7 @@ python3 main.py -q target -t username --clearnet --proxy-file /path/to/proxies.t
 --clearnet          Surface web only
 --darkweb           Dark web (Tor) only
 --both              Both surface + dark web
---tor ADDR          Tor SOCKS5 proxy address (default: 127.0.0.1:9050)
+--tor ADDR          Tor SOCKS5 proxy (default: 127.0.0.1:9050)
 --no-save           Skip writing output files
 --config PATH       Config file path (default: config/settings.yaml)
 --depth N           Dark web crawl depth 1-3 (default: 2)
@@ -261,17 +288,28 @@ python3 main.py -q target -t username --clearnet --proxy-file /path/to/proxies.t
 --proxy-file PATH   Override proxy file path
 ```
 
+### Examples
+
+```cmd
+.\run.bat -q user@example.com -t email --clearnet
+.\run.bat -q targetuser -t username --clearnet
+.\run.bat -q example.com -t domain --both --tor 127.0.0.1:9050
+.\run.bat -q 1.2.3.4 -t ip --clearnet
+.\run.bat -q 5f4dcc3b5aa765d61d8327deb882cf99 -t hash --clearnet
+.\run.bat -q target@mail.com -t email --both --depth 2 --no-save
+```
+
 ---
 
 ## Output
 
-Results are saved to `output/results/<type>_<query>_<timestamp>/`:
+Results saved to `output/results/<type>_<query>_<timestamp>/`:
 
 ```
 output/results/email_user_example_com_20240315_143022/
-├── results.json    # Full structured data
-├── results.csv     # Flat table (importable to Excel/LibreOffice)
-└── results.txt     # Human-readable report
+├── results.json
+├── results.csv
+└── results.txt
 ```
 
 ---
@@ -282,7 +320,7 @@ Edit `config/settings.yaml`:
 
 ```yaml
 workers:          20    # Surface web concurrent coroutines
-dark_workers:     8     # Tor concurrent coroutines (keep low)
+dark_workers:     8     # Tor concurrent coroutines
 dark_crawl_depth: 2     # Onion crawl hops (1=fast, 3=thorough)
 dark_crawl_pages: 5     # Pages per dark web engine
 min_delay:        1.2   # Min seconds between surface requests
@@ -291,21 +329,16 @@ dark_min_delay:   2.0   # Min seconds between Tor requests
 dark_max_delay:   7.0   # Max seconds between Tor requests
 ```
 
-A full `--both` scan with defaults takes **4–10 minutes**. Increase delays if you
-hit excessive captchas. Decrease `dark_workers` if Tor circuits time out frequently.
+A full `--both` scan with defaults takes 4–10 minutes.
 
 ---
 
 ## Disclaimer
 
-> **This tool is for authorised security research, penetration testing, and
-> defensive threat intelligence only.**
->
-> - You must have explicit permission before investigating any individual or system.
-> - Use in accordance with applicable laws in your jurisdiction.
-> - The author accepts no liability for any misuse of this software.
-> - Unauthorised use may violate the Computer Fraud and Abuse Act (CFAA),
->   the Computer Misuse Act (CMA), GDPR, and other laws.
+> This tool is for authorised security research, penetration testing, and defensive threat intelligence only.
+> You must have explicit permission before investigating any individual or system.
+> The author accepts no liability for any misuse of this software.
+> Unauthorised use may violate the CFAA, CMA, GDPR, and other laws.
 
 ---
 
