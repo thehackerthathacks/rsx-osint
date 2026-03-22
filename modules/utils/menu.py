@@ -17,6 +17,7 @@ SEARCH_TYPES = {
     "6": ("ip",       "IP address"),
     "7": ("domain",   "Domain / website"),
     "8": ("phone",    "Phone number"),
+    "9": ("recent",   "Latest public breaches feed  [no query needed]"),
 }
 
 
@@ -37,16 +38,19 @@ class InteractiveMenu:
         console.print(tbl)
 
         while True:
-            choice = Prompt.ask("\n  [green]>[/green] Select type [1-8]")
+            choice = Prompt.ask("\n  [green]>[/green] Select type [1-9]")
             if choice in SEARCH_TYPES:
                 args.type = SEARCH_TYPES[choice][0]
                 break
             console.print("  [red]Invalid — enter 1-8[/red]")
 
-        args.query = Prompt.ask(f"\n  [green]>[/green] Enter {args.type} to investigate").strip()
-        if not args.query:
-            console.print("[red]No query provided.[/red]")
-            import sys; sys.exit(1)
+        if args.type == "recent":
+            args.query = ""
+        else:
+            args.query = Prompt.ask(f"\n  [green]>[/green] Enter {args.type} to investigate").strip()
+            if not args.query:
+                console.print("[red]No query provided.[/red]")
+                import sys; sys.exit(1)
 
         # Network mode
         console.print("\n  [cyan][1][/cyan] Clearnet only")
