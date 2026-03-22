@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""
-RSX-OSINT  —  Advanced Breach & Dark Web Intelligence Framework
-Author   : RSX / Hacker
-License  : MIT
-GitHub   : https://github.com/your-handle/rsx-osint
-Usage    : python3 main.py [options]  or  python3 main.py  (interactive TUI)
-"""
 
 import asyncio
 import argparse
@@ -26,8 +19,13 @@ from modules.dorking.engines  import DorkEngine
 from modules.darkweb.engines  import DarkWebEngine
 from modules.darkweb.crawler  import OnionCrawler
 
+_tui   = TUI()
+_store = ResultStore()
+_cfg   = {}
+_args  = None
 
-async def run_scan(cfg, args, tui: TUI, store: ResultStore):
+
+async def run_scan(cfg, args, tui, store):
     proxy_mgr = ProxyManager(cfg)
     exporter  = Exporter(cfg, args.query, args.type)
 
@@ -44,24 +42,17 @@ async def run_scan(cfg, args, tui: TUI, store: ResultStore):
     tasks = []
 
     if use_clear:
-        breach = BreachModule(cfg, proxy_mgr, store, tui)
-        paste  = PasteModule(cfg, proxy_mgr, store, tui)
-        social = SocialModule(cfg, proxy_mgr, store, tui)
-        dork   = DorkEngine(cfg, proxy_mgr, store, tui)
-
         tasks += [
-            breach.run(args.query, args.type),
-            paste.run(args.query, args.type),
-            social.run(args.query, args.type),
-            dork.run(args.query, args.type),
+            BreachModule(cfg, proxy_mgr, store, tui).run(args.query, args.type),
+            PasteModule(cfg, proxy_mgr, store, tui).run(args.query, args.type),
+            SocialModule(cfg, proxy_mgr, store, tui).run(args.query, args.type),
+            DorkEngine(cfg, proxy_mgr, store, tui).run(args.query, args.type),
         ]
 
     if use_dark:
-        dw      = DarkWebEngine(cfg, tor_proxy, store, tui)
-        crawler = OnionCrawler(cfg, tor_proxy, store, tui)
         tasks += [
-            dw.run(args.query, args.type),
-            crawler.run(args.query, args.type),
+            DarkWebEngine(cfg, tor_proxy, store, tui).run(args.query, args.type),
+            OnionCrawler(cfg, tor_proxy, store, tui).run(args.query, args.type),
         ]
 
     await asyncio.gather(*tasks, return_exceptions=True)
@@ -73,67 +64,68 @@ async def run_scan(cfg, args, tui: TUI, store: ResultStore):
 def parse_args():
     p = argparse.ArgumentParser(
         prog="rsx-osint",
-        description="RSX-OSINT — Advanced Breach & Dark Web Intelligence",
+        description="RSX-OSINT — Recon & Search eXtended",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python3 main.py                                    # interactive TUI
+  python3 main.py
   python3 main.py -q user@example.com -t email --clearnet
   python3 main.py -q targetuser -t username --both --tor 127.0.0.1:9500
   python3 main.py -q example.com -t domain --clearnet --no-save
   python3 main.py -q 1.2.3.4 -t ip --clearnet
         """,
     )
-    p.add_argument("-q", "--query",    help="Target query string")
-    p.add_argument("-t", "--type",     help="Query type: email|username|password|hash|ip|domain|phone|name")
-    p.add_argument("--clearnet",       action="store_true", help="Surface web only")
-    p.add_argument("--darkweb",        action="store_true", help="Dark web (Tor) only")
-    p.add_argument("--both",           action="store_true", help="Both surface and dark web")
-    p.add_argument("--tor",            default=None,        help="Tor SOCKS5 proxy (default: 127.0.0.1:9050)")
-    p.add_argument("--no-save",        action="store_true", help="Do not write output files")
-    p.add_argument("--config",         default="config/settings.yaml", help="Config file path")
-    p.add_argument("--depth",          type=int, default=None, help="Dark web crawl depth (1-3)")
-    p.add_argument("--threads",        type=int, default=None, help="Override concurrent workers")
-    p.add_argument("--proxy-file",     default=None, help="Path to proxies.txt override")
+    p.add_argument("-q", "--query")
+    p.add_argument("-t", "--type")
+    p.add_argument("--clearnet",   action="store_true")
+    p.add_argument("--darkweb",    action="store_true")
+    p.add_argument("--both",       action="store_true")
+    p.add_argument("--tor",        default=None)
+    p.add_argument("--no-save",    action="store_true")
+    p.add_argument("--config",     default="config/settings.yaml")
+    p.add_argument("--depth",      type=int, default=None)
+    p.add_argument("--threads",    type=int, default=None)
+    p.add_argument("--proxy-file", default=None)
     return p.parse_args()
 
 
-def interactive_menu(tui: TUI, cfg: dict) -> argparse.Namespace:
-    from modules.utils.menu import InteractiveMenu
-    menu = InteractiveMenu(tui, cfg)
-    return menu.run()
-
-
 async def main():
-    tui = TUI()
-    tui.print_banner()
+    global _cfg, _args, _store
+
+    _tui.print_banner()
 
     args = parse_args()
     cfg  = load_config(args.config)
 
-    if args.depth:
-        cfg["dark_crawl_depth"] = args.depth
-    if args.threads:
-        cfg["workers"] = args.threads
-    if args.proxy_file:
-        cfg["proxy_file"] = args.proxy_file
-    if args.no_save:
-        cfg["save_results"] = False
+    if args.depth:      cfg["dark_crawl_depth"] = args.depth
+    if args.threads:    cfg["workers"]           = args.threads
+    if args.proxy_file: cfg["proxy_file"]        = args.proxy_file
+    if args.no_save:    cfg["save_results"]      = False
 
     if not args.query or not args.type:
-        args = interactive_menu(tui, cfg)
+        from modules.utils.menu import InteractiveMenu
+        args = InteractiveMenu(_tui, cfg).run()
 
-    store = ResultStore()
+    _cfg   = cfg
+    _args  = args
+    _store = ResultStore()
 
-    try:
-        await run_scan(cfg, args, tui, store)
-    except KeyboardInterrupt:
-        tui.warn("Interrupted — saving partial results...")
-        if store.count() > 0:
-            Exporter(cfg, args.query, args.type).save(store.all_results())
-        tui.print_summary(store, "output/results")
-        sys.exit(0)
+    await run_scan(cfg, args, _tui, _store)
+
+
+def _save_partial():
+    if _store.count() > 0 and _args and _cfg:
+        _tui.warn("Interrupted — saving partial results...")
+        try:
+            Exporter(_cfg, _args.query, _args.type).save(_store.all_results())
+        except Exception:
+            pass
+        _tui.print_summary(_store, _cfg.get("output_dir", "output/results"))
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        _save_partial()
+        sys.exit(0)
