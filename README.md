@@ -145,7 +145,7 @@ Or with flags:
 ### Manual install (any OS)
 
 ```bash
-git clone https://github.com/your-handle/rsx-osint.git
+git clone https://github.com/thhackerthathacks/rsx-osint.git
 cd rsx-osint
 python3 -m venv venv
 
