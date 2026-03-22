@@ -11,6 +11,12 @@ from typing import Optional
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+try:
+    from aiohttp_socks import ProxyConnector, ProxyType
+    _SOCKS_AVAILABLE = True
+except ImportError:
+    _SOCKS_AVAILABLE = False
+
 _UA_LIST = []
 
 
@@ -45,16 +51,14 @@ def base_headers() -> dict:
 
 async def async_get(url: str, proxy: Optional[str] = None,
                     timeout: int = 20, headers: dict = None,
-                    retries: int = 2) -> Optional[aiohttp.ClientResponse]:
+                    retries: int = 2) -> Optional["_FakeResponse"]:
     hdrs = base_headers()
     if headers:
         hdrs.update(headers)
-    connector_kwargs = {}
-    if url.startswith("http://") and ".onion" in url:
-        pass
+
     for attempt in range(retries + 1):
         try:
-            conn = aiohttp.TCPConnector(ssl=False)
+            conn        = aiohttp.TCPConnector(ssl=False)
             timeout_obj = aiohttp.ClientTimeout(total=timeout)
             async with aiohttp.ClientSession(
                 connector=conn, timeout=timeout_obj, headers=hdrs
@@ -69,6 +73,8 @@ async def async_get(url: str, proxy: Optional[str] = None,
             if attempt == retries:
                 return None
             await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            raise
         except Exception:
             if attempt == retries:
                 return None
@@ -81,22 +87,38 @@ async def async_get_tor(url: str, tor_proxy: str, timeout: int = 40,
     hdrs = base_headers()
     if headers:
         hdrs.update(headers)
-    socks_url = f"socks5h://{tor_proxy}"
+
+    if not _SOCKS_AVAILABLE:
+        raise RuntimeError(
+            "aiohttp-socks is not installed — Tor requests require it.\n"
+            "Run: pip install aiohttp-socks"
+        )
+
+    host, _, port_str = tor_proxy.partition(":")
+    port = int(port_str) if port_str else 9050
+
     for attempt in range(retries + 1):
         try:
-            conn = aiohttp.TCPConnector(ssl=False)
+            connector = ProxyConnector(
+                proxy_type=ProxyType.SOCKS5,
+                host=host,
+                port=port,
+                rdns=True,
+                ssl=False,
+            )
             timeout_obj = aiohttp.ClientTimeout(total=timeout)
             async with aiohttp.ClientSession(
-                connector=conn, timeout=timeout_obj, headers=hdrs
+                connector=connector, timeout=timeout_obj, headers=hdrs
             ) as session:
-                async with session.get(url, proxy=socks_url,
-                                       allow_redirects=True) as resp:
+                async with session.get(url, allow_redirects=True) as resp:
                     text = await resp.text(errors="replace")
                     return _FakeResponse(resp.status, text, str(resp.url))
         except asyncio.TimeoutError:
             if attempt == retries:
                 return None
             await asyncio.sleep(2)
+        except asyncio.CancelledError:
+            raise
         except Exception:
             if attempt == retries:
                 return None
@@ -107,15 +129,30 @@ async def async_get_tor(url: str, tor_proxy: str, timeout: int = 40,
 async def async_post_tor(url: str, tor_proxy: str, data: dict = None,
                          timeout: int = 40) -> Optional["_FakeResponse"]:
     hdrs = base_headers()
-    socks_url = f"socks5h://{tor_proxy}"
+
+    if not _SOCKS_AVAILABLE:
+        raise RuntimeError("aiohttp-socks is not installed.")
+
+    host, _, port_str = tor_proxy.partition(":")
+    port = int(port_str) if port_str else 9050
+
     try:
-        conn = aiohttp.TCPConnector(ssl=False)
-        to = aiohttp.ClientTimeout(total=timeout)
-        async with aiohttp.ClientSession(connector=conn, timeout=to, headers=hdrs) as s:
-            async with s.post(url, proxy=socks_url, data=data,
-                              allow_redirects=True) as resp:
+        connector = ProxyConnector(
+            proxy_type=ProxyType.SOCKS5,
+            host=host,
+            port=port,
+            rdns=True,
+            ssl=False,
+        )
+        timeout_obj = aiohttp.ClientTimeout(total=timeout)
+        async with aiohttp.ClientSession(
+            connector=connector, timeout=timeout_obj, headers=hdrs
+        ) as session:
+            async with session.post(url, data=data, allow_redirects=True) as resp:
                 text = await resp.text(errors="replace")
                 return _FakeResponse(resp.status, text, str(resp.url))
+    except asyncio.CancelledError:
+        raise
     except Exception:
         return None
 
