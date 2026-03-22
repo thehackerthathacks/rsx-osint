@@ -1,4 +1,4 @@
-# RSX-OSINT
+# RSX-OSINT / Recon & Search eXtended 
 
 > **Advanced Breach & Dark Web Intelligence Framework**  
 > For authorised security research and ethical penetration testing only.
