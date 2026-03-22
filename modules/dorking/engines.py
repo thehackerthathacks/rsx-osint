@@ -41,12 +41,24 @@ class DorkEngine:
         dorks = get_dorks(qtype, query)
 
         has_proxies = self.pm.has_proxies()
-        if not has_proxies:
-            self.tui.warn("No proxies configured — dork engines will likely hit captchas quickly")
-            self.tui.warn("Add proxies to config/proxies.txt for better results")
+        has_solver  = self.solver.enabled
 
         active_engines = [e for e in self.engines
                           if e in ("google", "bing", "duckduckgo", "startpage", "yahoo")]
+
+        if not has_proxies and not has_solver:
+            self.tui.warn(
+                "No proxies or captcha solver configured — "
+                "skipping all dork engines to avoid pointless blocks."
+            )
+            self.tui.warn(
+                "Add proxies to config/proxies.txt or set captcha_service "
+                "in config/settings.yaml to enable dorking."
+            )
+            return
+
+        if not has_proxies:
+            self.tui.warn("No proxies configured — captcha solver will handle blocks")
 
         self.tui.info(f"Dork engine — {len(dorks)} dork templates × {len(active_engines)} engines")
 
@@ -62,18 +74,14 @@ class DorkEngine:
         self.tui.info(f"{engine.capitalize()} — starting dork sweep ({len(dorks)} queries)...")
         consecutive_blocks = 0
         total_results      = 0
+        no_help            = not self.pm.has_proxies() and not self.solver.enabled
 
         for dork in dorks:
             if consecutive_blocks >= MAX_CONSECUTIVE_BLOCKS:
-                if not self.pm.has_proxies() or not self.solver.enabled:
-                    self.tui.warn(
-                        f"{engine}: blocked {consecutive_blocks}x with no proxies/captcha solver "
-                        f"— skipping engine (add proxies to config/proxies.txt)"
-                    )
-                    return
-                self.tui.warn(f"{engine}: {consecutive_blocks} consecutive blocks — waiting 30s")
-                await asyncio.sleep(30)
-                consecutive_blocks = 0
+                self.tui.warn(
+                    f"{engine}: {consecutive_blocks} consecutive blocks — skipping engine"
+                )
+                return
 
             proxy = self.pm.get()
 
@@ -93,6 +101,13 @@ class DorkEngine:
             if self._is_blocked(resp):
                 consecutive_blocks += 1
                 self.tui.warn(f"{engine}: block/captcha detected (attempt {consecutive_blocks}/{MAX_CONSECUTIVE_BLOCKS})")
+
+                if no_help:
+                    if consecutive_blocks >= MAX_CONSECUTIVE_BLOCKS:
+                        self.tui.warn(f"{engine}: blocked — skipping engine")
+                        return
+                    await self._jitter()
+                    continue
 
                 token = await self._attempt_captcha_solve(engine, resp, dork)
                 if token:
