@@ -1,0 +1,19 @@
+# RSX-OSINT Proxy List
+# One proxy per line. Supported formats:
+#   http://1.2.3.4:8080
+#   http://user:pass@1.2.3.4:8080
+#   socks5://1.2.3.4:1080
+#   socks5://user:pass@1.2.3.4:1080
+#
+# Free proxy sources (quality varies):
+#   https://free-proxy-list.net
+#   https://www.proxyscrape.com/free-proxy-list
+#   https://hidemy.name/en/proxy-list/
+#
+# Recommended: use paid rotating proxies (Oxylabs, Bright Data, Smartproxy)
+# for reliable dork scraping without captcha blocks.
+#
+# Example entries (replace with real proxies):
+# http://45.77.123.45:3128
+# socks5://192.168.1.100:1080
+# http://proxy_user:proxy_pass@gate.example.com:8000

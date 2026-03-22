@@ -1,0 +1,17 @@
+aiohttp>=3.9.0
+aiohttp-socks>=0.8.4
+asyncio-throttle>=1.0.2
+beautifulsoup4>=4.12.0
+colorama>=0.4.6
+lxml>=5.1.0
+playwright>=1.41.0
+pyyaml>=6.0.1
+requests>=2.31.0
+requests[socks]
+PySocks>=1.7.1
+rich>=13.7.0
+tqdm>=4.66.0
+fake-useragent>=1.4.0
+stem>=1.8.2
+aiofiles>=23.2.1
+python-dotenv>=1.0.0

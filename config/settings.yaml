@@ -1,0 +1,89 @@
+# RSX-OSINT Configuration
+# Edit this file to customize behaviour.
+
+# ─── Tor ──────────────────────────────────────────────────────────────────────
+tor_proxy:   "127.0.0.1:9050"          # SOCKS5 address of your Tor instance
+tor_control_port: 9051                  # Control port for circuit renewal (stem)
+tor_password: ""                        # HashedControlPassword (blank = none)
+
+# ─── Workers / Performance ────────────────────────────────────────────────────
+workers:           20                   # Async coroutines for surface web
+dark_workers:      8                    # Async coroutines for onion requests
+dark_crawl_depth:  2                    # How many link hops to follow on .onion pages (1-3)
+dark_crawl_pages:  5                    # Max paginated pages per dark-web search engine
+request_timeout:   25                   # Seconds per request
+dark_timeout:      40                   # Seconds per onion request
+min_delay:         1.2                  # Min random delay between requests (secs)
+max_delay:         4.5                  # Max random delay between requests (secs)
+dark_min_delay:    2.0                  # Min delay for Tor requests
+dark_max_delay:    7.0                  # Max delay for Tor requests
+
+# ─── Proxies ──────────────────────────────────────────────────────────────────
+proxy_file:        "config/proxies.txt" # One proxy per line (http/socks5)
+rotate_proxies:    true                 # Rotate proxies per request
+proxy_on_captcha:  true                 # Auto-rotate proxy on 429/CAPTCHA
+
+# ─── Captcha Solving ──────────────────────────────────────────────────────────
+captcha_service:   ""                   # "2captcha" | "anticaptcha" | "" (disabled)
+captcha_api_key:   ""                   # Your 2captcha or anticaptcha API key
+
+# ─── Playwright (JS fallback) ─────────────────────────────────────────────────
+use_playwright:    false                # Enable headless browser for JS-heavy pages
+playwright_browser: "firefox"          # "chromium" | "firefox" | "webkit"
+playwright_headless: true
+
+# ─── Search engines ───────────────────────────────────────────────────────────
+enabled_dork_engines:
+  - google
+  - bing
+  - duckduckgo
+  - startpage
+  - yahoo
+
+enabled_dark_engines:
+  - ahmia
+  - torch
+  - haystak
+  - darksearch
+  - notevil
+  - phobos
+  - excavator
+  - kilos
+  - onionsearchengine
+
+# ─── Breach sources ───────────────────────────────────────────────────────────
+enabled_breach_sources:
+  - haveibeenpwned
+  - breachdirectory
+  - proxynova
+  - leakcheck
+  - ghostproject
+  - snusbase
+  - intelx
+  - leakix
+  - emailrep
+  - hunter
+  - whatsmyname
+  - shodan
+  - virustotal
+  - urlscan
+  - crtsh
+  - numverify
+
+# ─── API Keys (optional) ──────────────────────────────────────────────────────
+api_keys:
+  hibp:            ""   # https://haveibeenpwned.com/API/Key  ($3.50/mo)
+  hunter:          ""   # https://hunter.io  (free 25/mo)
+  virustotal:      ""   # https://virustotal.com  (free tier)
+  snusbase:        ""   # https://snusbase.com  (paid)
+  leakix:          ""   # https://leakix.net  (free tier)
+  breachdirectory: ""   # https://breachdirectory.org  (free tier)
+
+# ─── Output ───────────────────────────────────────────────────────────────────
+save_results:      true
+output_dir:        "output/results"
+output_formats:
+  - json
+  - csv
+  - txt
+max_results_per_source: 50
